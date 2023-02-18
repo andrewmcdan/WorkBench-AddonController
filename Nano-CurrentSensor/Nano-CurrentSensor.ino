@@ -10,7 +10,21 @@
  */
 #include <Wire.h>
 
-enum wireCommands:int {readOneSensorAvg,readAllSensorsAvg,readSelectedSensorsAvg,setSensorVperA,getStatus,readOneSensorInstant,readOneSensorRaw,readOneSensorMax,resetOneSensorMax};
+enum wireCommands:int {
+    readOneSensorAvg,
+    readAllSensorsAvg,
+    readSelectedSensorsAvg,
+    setSensorVperA,
+    getStatus,
+    readOneSensorInstant,
+    readOneSensorRaw,
+    readOneSensorMax,
+    resetOneSensorMax,
+    getNumSerialBytesAvailable,
+    getAvailableSerialBytes,
+    setSerialBaud,
+    writeSerialData
+    };
 
 class ACS712{
 private:
@@ -79,6 +93,9 @@ ACS712* ammeters[6] = {&ammeter0,&ammeter1,&ammeter2,&ammeter3,&ammeter4,&ammete
 
 unsigned char wireInCommand[4] = {0};
 bool ready[2] = {false,false};
+unsigned int numSerialBytesRead = 0, numSerialByteToBeWritten = 0;
+unsigned char serialDataIn[256], serialDataOut[256];
+unsigned int serialDataInIndex = 0, serialDataOutIndex = 0;
 
 void setup()
 {
@@ -101,6 +118,20 @@ void loop()
     for(int i = 0; i < 6; i++){
         ammeters[i]->update();
     }
+
+    while(Serial.available()){
+        serialDataIn[serialDataInIndex]Serial.read();
+        serialDataInIndex++;
+        if(serialDataInIndex > 255) serialDataInIndex = 0;
+        numSerialBytesRead++;
+    }
+
+    while (numSerialByteToBeWritten > 0){
+        Serial.write(serialDataOut[serialDataOutIndex]);
+        serialDataOutIndex++;
+        if(serialDataOutIndex > 255) serialDataOutIndex = 0;
+        numSerialByteToBeWritten--;
+    }
 }
 
 void wireReceiveEvent(int numBytes){
@@ -111,18 +142,7 @@ void wireReceiveEvent(int numBytes){
         incoming[byteCount] = Wire.read();
         byteCount++;
     }
-    if(Wire.available()){
-        Serial.println("Error1");
-        while(Wire.available()){
-            Wire.read();
-        }
-        for(int i = 0; i < 4; i++) wireInCommand[i] = 0;
-    }else if(byteCount > 4){
-        Serial.println("Error2");
-        for(int i = 0; i < 4; i++) wireInCommand[i] = 0;
-    }else{
-        for(int i = 0; i < numBytes; i++) wireInCommand[i] = incoming[i];
-    }
+    
     if(wireInCommand[0] == wireCommands::setSensorVperA && wireInCommand[1] < 6){
         unsigned int val1 = wireInCommand[2];
         unsigned int val2 = wireInCommand[3];
@@ -216,6 +236,18 @@ void wireRequestEvent(){
                 }
                 command >> 1;
             }
+            break;
+        }
+        case wireCommands::getNumSerialBytesAvailable:
+        {
+            break;
+        }
+        case wireCommands::getAvailableSerialBytes:
+        {
+            break;
+        }
+        case wireCommands::setSerialBaud:
+        {
             break;
         }
     }
