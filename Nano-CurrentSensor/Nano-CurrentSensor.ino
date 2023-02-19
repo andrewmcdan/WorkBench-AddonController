@@ -124,6 +124,7 @@ void loop()
         serialDataInIndex++;
         if(serialDataInIndex > 255) serialDataInIndex = 0;
         numSerialBytesRead++;
+        if(numSerialBytesRead > 256) numSerialBytesRead = 256;
     }
 
     while (numSerialByteToBeWritten > 0){
