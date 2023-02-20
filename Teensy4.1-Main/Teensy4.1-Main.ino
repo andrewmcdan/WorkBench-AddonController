@@ -30,7 +30,13 @@ enum ammeterWireCommands:int {
     setSensorVperA,
     getStatus,
     readOneSensorInstant,
-    readOneSensorRaw
+    readOneSensorRaw,
+    readOneSensorMax,
+    resetOneSensorMax,
+    getNumSerialBytesAvailable,
+    getAvailableSerialBytes,
+    setSerialBaud,
+    writeSerialData
 };
 enum ammeterWireNumBytesToRead:int {
     readOneSensor = 5, 
