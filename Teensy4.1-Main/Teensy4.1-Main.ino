@@ -8,20 +8,36 @@
 #include <Wire.h>
 #include <EEPROM.h>
 #include <MIDI.h>
-#include "Teensy-Main-lib.h"
+#include "Teensy4.1-Main.h"
 
 #define AMMETER1_ADDR 0x08
 #define AMMETER2_ADDR 0x09
-#define SER_IN_BUF_SIZE 1048576 // 2^20 - This is quite large for a serial buffer, but why not?
+#define BIG_BUF_SIZE 65536 // 2^20 - This is quite large for a serial buffer, but why not?
 #define AMMETER_READING_TIME_MS 100
 
 // these must be set according to which ammeters are soldered onto the PCB
 const int ammeter1_mVperA[6] = { 40,40,185,185,185,185 }; // 50A, 50A, 5A, 5A, 5A, 5A
 const int ammeter2_mVperA[6] = { 66,66,66,66,185,185 }; //  30A, 30A, 30A, 30A, 5A, 5A
 
-EXTMEM char bigBufferForIncomingSerial[SER_IN_BUF_SIZE];
+EXTMEM char bigBuffer1[BIG_BUF_SIZE];
+EXTMEM char bigBuffer2[BIG_BUF_SIZE];
+EXTMEM char bigBuffer3[BIG_BUF_SIZE];
+EXTMEM char bigBuffer4[BIG_BUF_SIZE];
+EXTMEM char bigBuffer5[BIG_BUF_SIZE];
+EXTMEM char bigBuffer6[BIG_BUF_SIZE];
+EXTMEM char bigBuffer7[BIG_BUF_SIZE];
+EXTMEM char bigBuffer8[BIG_BUF_SIZE];
 
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial3, serialMIDI);
+char* bigBufs[] = {&bigBuffer1,&bigBuffer2,&bigBuffer3,&bigBuffer4,&bigBuffer5,&bigBuffer6,&bigBuffer7,bigBuffer8};
+
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, serialMIDI_1);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, serialMIDI_2);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial3, serialMIDI_3);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial4, serialMIDI_4);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial5, serialMIDI_5);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial6, serialMIDI_6);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial7, serialMIDI_7);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, serialMIDI_8);
 
 enum ammeterWireCommands:int {
     readOneSensorAvg,
@@ -211,10 +227,7 @@ public:
     void setMeterReadTime_Hz(int hertz) {
         this->meterReadTimeMillis = 1000 / hertz;
     }
-
-
 };
-
 
 Ammeter_manager meters(AMMETER1_ADDR,AMMETER2_ADDR);
 
@@ -223,16 +236,16 @@ void setup() {
     Wire1.begin();
     Wire.setClock(400000);
     Wire1.setClock(400000);
-    Serial.begin(115200);
+    //Serial.begin(115200);
     while (!Serial) {}
-    Serial.print('#');
-    serialMIDI.begin();
+    //Serial.print('#');
+    serialMIDI.begin(); 
     serialMIDI.setThruFilterMode(midi::Thru::Full);
     serialMIDI.turnThruOn();
     serialMIDI.setHandleNoteOn(handleSerMidiNoteOnOff);
     serialMIDI.setHandleNoteOff(handleSerMidiNoteOnOff);
-    USBmidi.setHandleNoteOn(handleUsbMidiNoteOnOff);
-    USBmidi.setHandleNoteOff(handleUsbMidiNoteOnOff);
+    //USBmidi.setHandleNoteOn(handleUsbMidiNoteOnOff);
+    //USBmidi.setHandleNoteOff(handleUsbMidiNoteOnOff);
 }
 elapsedMillis watchdog = 1100;
 void loop() {
@@ -241,17 +254,33 @@ void loop() {
         Serial8.println("test");
         watchdog = 0;
     }
-    terminal.update();
-    mainLCD.update();
-    usb_Host.Task();
-    USBmidi.read();
-    wireBufForLCDs.sendNextOutMessage();
+    Serial.write(0b10101010);
+    Serial.write(0b11001100);
+    Serial.write(0);
+    Serial.write(14);
+    Serial.write(0xa0);
+    Serial.Write(1);
+
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
+    
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
+    
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
+    Serial.Write(0);
 }
 
 void handleSerMidiNoteOnOff(byte channel, byte note, byte velocity) {
-    terminal.handleSerMIDInoteOnOff(channel, note, velocity);
+    //terminal.handleSerMIDInoteOnOff(channel, note, velocity);
 }
 
 void handleUsbMidiNoteOnOff(byte channel, byte note, byte velocity) {
-    terminal.handleUsbMIDInoteOnOff(channel, note, velocity);
+    //terminal.handleUsbMIDInoteOnOff(channel, note, velocity);
 }
