@@ -28,7 +28,7 @@ EXTMEM char bigBuffer6[BIG_BUF_SIZE];
 EXTMEM char bigBuffer7[BIG_BUF_SIZE];
 EXTMEM char bigBuffer8[BIG_BUF_SIZE];
 
-char* bigBufs[] = {&bigBuffer1,&bigBuffer2,&bigBuffer3,&bigBuffer4,&bigBuffer5,&bigBuffer6,&bigBuffer7,bigBuffer8};
+//char* bigBufs[8] = {&bigBuffer1,&bigBuffer2,&bigBuffer3,&bigBuffer4,&bigBuffer5,&bigBuffer6,&bigBuffer7,&bigBuffer8};
 
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, serialMIDI_1);
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, serialMIDI_2);
@@ -236,14 +236,14 @@ void setup() {
     Wire1.begin();
     Wire.setClock(400000);
     Wire1.setClock(400000);
-    //Serial.begin(115200);
+    Serial.begin(115200);
     while (!Serial) {}
     //Serial.print('#');
-    serialMIDI.begin(); 
-    serialMIDI.setThruFilterMode(midi::Thru::Full);
-    serialMIDI.turnThruOn();
-    serialMIDI.setHandleNoteOn(handleSerMidiNoteOnOff);
-    serialMIDI.setHandleNoteOff(handleSerMidiNoteOnOff);
+    //serialMIDI.begin(); 
+    //serialMIDI.setThruFilterMode(midi::Thru::Full);
+    //serialMIDI.turnThruOn();
+    //serialMIDI.setHandleNoteOn(handleSerMidiNoteOnOff);
+    //serialMIDI.setHandleNoteOff(handleSerMidiNoteOnOff);
     //USBmidi.setHandleNoteOn(handleUsbMidiNoteOnOff);
     //USBmidi.setHandleNoteOff(handleUsbMidiNoteOnOff);
 }
@@ -259,22 +259,22 @@ void loop() {
     Serial.write(0);
     Serial.write(14);
     Serial.write(0xa0);
-    Serial.Write(1);
+    Serial.write(1);
 
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
     
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
     
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
-    Serial.Write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
 }
 
 void handleSerMidiNoteOnOff(byte channel, byte note, byte velocity) {
