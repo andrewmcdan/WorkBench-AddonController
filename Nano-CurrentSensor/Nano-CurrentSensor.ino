@@ -9,21 +9,25 @@
  * @board Duemilanove / Nano
  */
 #include <Wire.h>
+#include "Arduino.h"
 
 enum wireCommands:int {
-    readOneSensorAvg,
-    readAllSensorsAvg,
-    readSelectedSensorsAvg,
-    setSensorVperA,
-    getStatus,
-    readOneSensorInstant,
-    readOneSensorRaw,
-    readOneSensorMax,
-    resetOneSensorMax,
-    getNumSerialBytesAvailable,
-    getAvailableSerialBytes,
-    setSerialBaud,
-    writeSerialData
+    readOneSensorAvg,//
+    readAllSensorsAvg,//
+    setSensorVperA,//
+    getStatus,//
+    readOneSensorRaw,//
+    readOneSensorInstant,//
+    readAllSensorsInstant,//
+    readOneSensorMax,//
+    readAllSensorsMax,//
+    resetOneSensorMax,// 
+    resetAllSensorsMax,//
+    getNumSerialBytesAvailable,//
+    getAvailableSerialBytes,//
+    setSerialBaud,//
+    writeSerialData,//
+    setAveragerN_vals//
     };
 
 class ACS712{
@@ -32,11 +36,15 @@ private:
     int pin;
     double voltsPerAmp = 0;
     long averageMilliAmps;
-    long averager[20] = { 0 };
+    long averager[100] = { 0 };
     long maxMilliamps = 0;
+    long instantMilliamps = 0;
+    uint8_t averagerN_vals = 20;
 public:
     ACS712(int pinNum){
         pin = pinNum;
+        // @TODO:
+        // read calibration value form EEPROM if it is set.
     }
     ~ACS712(){}
 
@@ -57,19 +65,21 @@ public:
     }
     void update(){
         if(voltsPerAmp == 0)return;
-        for(int i = 0; i < 19; i++){
+        for(int i = 0; i < averagerN_vals - 1; i++){
             averager[i] = averager[i+1];
         }
-        averager[19] = this->getMilliAmps();
+        this->instantMilliamps = averager[averagerN_vals - 1] = this->getMilliAmps();
         long long total = 0;
         for(int i = 0; i < 20; i++){
             total += averager[i];
         }
-        averageMilliAmps = total/20;
+        averageMilliAmps = total/averagerN_vals;
     }
     void set_mvPerA(unsigned int val){
         if(val == 0) return;
         voltsPerAmp = val / 1000.0;
+        // @TODO:
+        // This needs to be written to EEPROM
     }
     bool isReady(){
         if(voltsPerAmp == 0.0)return false;
@@ -81,6 +91,11 @@ public:
     long getMaxMilliamps() {
         return this->maxMilliamps;
     }
+
+    void setAveragerN_vals(int v){
+        if(v > 100)return;
+        this->averagerN_vals = v;
+    }
 };
 
 ACS712 ammeter0(A0);
@@ -91,17 +106,24 @@ ACS712 ammeter4(A6);
 ACS712 ammeter5(A7);
 ACS712* ammeters[6] = {&ammeter0,&ammeter1,&ammeter2,&ammeter3,&ammeter4,&ammeter5};
 
-unsigned char wireInCommand[4] = {0};
+unsigned char wireInCommand[32] = {0};
 bool ready[2] = {false,false};
 unsigned int numSerialBytesRead = 0, numSerialByteToBeWritten = 0;
 unsigned char serialDataIn[256], serialDataOut[256];
 unsigned int serialDataInIndex = 0, serialDataOutIndex = 0;
+unsigned int delayTime = 1;
 
 void setup()
 {
     pinMode(12,INPUT_PULLUP);
+    pinMode(11,INPUT_PULLUP);
+    pinMode(10,INPUT_PULLUP);
+    pinMode(9,INPUT_PULLUP);
+    pinMode(8,INPUT_PULLUP);
+    pinMode(7,INPUT_PULLUP);
+    pinMode(6,INPUT_PULLUP);
     Serial.begin(115200);
-    Wire.begin(8+digitalRead(12));
+    Wire.begin(digitalRead(12) + (digitalRead(11) << 1) + (digitalRead(10) << 2) + (digitalRead(9) << 3) + (digitalRead(8) << 4) + (digitalRead(7) << 5) + (digitalRead(6) << 6));
     Wire.onReceive(wireReceiveEvent);
     Wire.onRequest(wireRequestEvent);
     pinMode(A0, INPUT);
@@ -120,7 +142,7 @@ void loop()
     }
 
     while(Serial.available()){
-        serialDataIn[serialDataInIndex]Serial.read();
+        serialDataIn[serialDataInIndex] = Serial.read();
         serialDataInIndex++;
         if(serialDataInIndex > 255) serialDataInIndex = 0;
         numSerialBytesRead++;
@@ -133,34 +155,52 @@ void loop()
         if(serialDataOutIndex > 255) serialDataOutIndex = 0;
         numSerialByteToBeWritten--;
     }
+    delayMicroseconds(delayTime);
 }
 
 void wireReceiveEvent(int numBytes){
     int byteCount = 0;
-    unsigned char incoming[numBytes] = {0};
-    for(int i = 0; i < 4; i++)wireInCommand[i] = 0;
+    for(int i = 0; i < 32; i++)wireInCommand[i] = 0;
     while(Wire.available() && byteCount < numBytes){
-        incoming[byteCount] = Wire.read();
+        wireInCommand[byteCount] = Wire.read();
         byteCount++;
     }
     
-    if(wireInCommand[0] == wireCommands::setSensorVperA && wireInCommand[1] < 6){
-        unsigned int val1 = wireInCommand[2];
-        unsigned int val2 = wireInCommand[3];
-        unsigned int val3 = (val1 << 8) | val2;
-        ammeters[wireInCommand[1]]->set_mvPerA(val3);
-        // Serial.print("set_mvPerA: ");
-        // Serial.println(val3);
-        if( ammeters[0]->isReady() &&
-            ammeters[1]->isReady() &&
-            ammeters[2]->isReady() &&
-            ammeters[3]->isReady() &&
-            ammeters[4]->isReady() &&
-            ammeters[5]->isReady()) ready[1] = true;
+    switch(wireInCommand[0]){
+        case wireCommands::setSensorVperA:
+        {
+            if(wireInCommand[1] < 6){
+                unsigned int val1 = wireInCommand[2];
+                unsigned int val2 = wireInCommand[3];
+                unsigned int val3 = (val1 << 8) | val2;
+                ammeters[wireInCommand[1]]->set_mvPerA(val3);
+                // Serial.print("set_mvPerA: ");
+                // Serial.println(val3);
+                if( ammeters[0]->isReady() &&
+                    ammeters[1]->isReady() &&
+                    ammeters[2]->isReady() &&
+                    ammeters[3]->isReady() &&
+                    ammeters[4]->isReady() &&
+                    ammeters[5]->isReady()) ready[1] = true;
+            }
+            break;
+        }
+        case wireCommands::resetOneSensorMax:
+        {
+            if (wireInCommand[1] < 6) {
+                ammeters[wireInCommand[1]]->resetMaxMillis();
+            }
+            break;
+        }
+        case wireCommands::resetAllSensorsMax:
+        {
+            for(int i = 0; i < 6; i++){
+                ammeters[i]->resetMaxMillis();
+            }
+        }
     }
-    if (wireInCommand[0] == wireCommands::resetOneSensorMax && wireInCommand[1] < 6) {
-        ammeters[wireInCommand[1]]->resetMaxMillis();
-    }
+    
+    
 }
 
 void wireRequestEvent(){
@@ -197,28 +237,9 @@ void wireRequestEvent(){
             }
             break;
         }
-        case wireCommands::readSelectedSensorsAvg:
-        {
-            unsigned char command = wireInCommand[1];
-            int count = countBits(command);
-            Wire.write(4 * count);
-            for(int i = 0; i < 6; i++){
-                if(command & 1 == 1){
-                    long val = ammeters[i]->getAverageMilliAmps();
-                    Wire.write(val >> 24);
-                    Wire.write(val >> 16);
-                    Wire.write(val >> 8);
-                    Wire.write(val & 0xff);
-                }
-                command >> 1;
-            }
-            break;
-        }
         case wireCommands::getStatus:
         {
-            Wire.write(1);
-            // if(ready[0] && ready[1])Wire.write(0xff);
-            // else Wire.write(0);
+            Wire.write(0xaa); // indicates that this is an ammeter
             Wire.write(((ready[0])?0xf0:0x00) | ((ready[1])?0x0f:0x00));
             break;
         }
