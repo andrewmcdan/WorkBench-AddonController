@@ -11,6 +11,7 @@
 #include "Teensy4.1-Main.h"
 #include <functional>
 #include <vector>
+#include <SoftwareSerial.h>
 
 #define BIG_BUF_SIZE 65536
 #define METER_READING_TIME_MS 50
@@ -34,7 +35,7 @@ char* bigBufs[MAX_NUMBER_OF_METERS];
 // MIDI_CREATE_INSTANCE(HardwareSerial, Serial7, serialMIDI_7);
 // MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, serialMIDI_8);
 
-// this does the same as the macro calls, but stores the midi devices
+// this does the same as the macro calls above, but stores the midi devices
 // in an array for ease of use.
 midi::SerialMIDI<HardwareSerial> serialMIDI_1(Serial1);
 midi::SerialMIDI<HardwareSerial> serialMIDI_2(Serial2);
@@ -46,14 +47,42 @@ midi::SerialMIDI<HardwareSerial> serialMIDI_7(Serial7);
 midi::SerialMIDI<HardwareSerial> serialMIDI_8(Serial8);
 
 midi::MidiInterface<midi::SerialMIDI<HardwareSerial>> HW_midi[] = {
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_1,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_2,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_3,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_4,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_5,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_6,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_7,
-        (midi::SerialMIDI<HardwareSerial> &)serialMIDI_8 };
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_1,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_2,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_3,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_4,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_5,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_6,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_7,
+    (midi::SerialMIDI<HardwareSerial> &)serialMIDI_8 };
+
+SoftwareSerial softSer_1 = SoftwareSerial(2,3);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_1(softSer_1);
+SoftwareSerial softSer_2 = SoftwareSerial(4,5);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_2(softSer_2);
+SoftwareSerial softSer_3 = SoftwareSerial(9,10);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_3(softSer_3);
+SoftwareSerial softSer_4 = SoftwareSerial(11,12);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_4(softSer_4);
+SoftwareSerial softSer_5 = SoftwareSerial(26,27);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_5(softSer_5);
+SoftwareSerial softSer_6 = SoftwareSerial(30,31);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_6(softSer_6);
+SoftwareSerial softSer_7 = SoftwareSerial(32,33);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_7(softSer_7);
+SoftwareSerial softSer_8 = SoftwareSerial(36,37);
+midi::SerialMIDI<SoftwareSerial> softSerMidi_8(softSer_8);
+
+midi::MidiInterface<midi::SerialMIDI<SoftwareSerial>> SW_midi[] = {
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_1,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_2,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_3,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_4,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_5,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_6,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_7,
+    (midi::SerialMIDI<SoftwareSerial> &)softSerMidi_8 };
+
 
 class SerialMidiManager{
 public:
@@ -62,20 +91,30 @@ public:
         this->usbCable = cable;
         this->midiDev->begin(MIDI_CHANNEL_OMNI);
         this->setThru(false);
+        this->softSer = false;
+    }
+
+    SerialMidiManager(midi::MidiInterface<midi::SerialMIDI<SoftwareSerial>>* serMidiDev, int cable){
+        this->SoftSer_midiDev = serMidiDev;
+        this->usbCable = cable;
+        this->SoftSer_midiDev->begin(MIDI_CHANNEL_OMNI);
+        this->setThru(false);
+        this->softSer = false;
     }
 
     void update(){
-        if(this->midiDev->read()){
-            byte type = this->midiDev->getType();
-            byte chan = this->midiDev->getChannel();
-            byte data1 = this->midiDev->getData1();
-            byte data2 = this->midiDev->getData2();
+
+        if(this->softSer?this->SoftSer_midiDev->read():this->midiDev->read()){
+            byte type = this->softSer?this->SoftSer_midiDev->getType():this->midiDev->getType();
+            byte chan = this->softSer?this->SoftSer_midiDev->getChannel():this->midiDev->getChannel();
+            byte data1 = this->softSer?this->SoftSer_midiDev->getData1():this->midiDev->getData1();
+            byte data2 = this->softSer?this->SoftSer_midiDev->getData2():this->midiDev->getData2();
             if(type!=midi::SystemExclusive){
                 usbMIDI.send(type,data1,data2,chan,this->usbCable);
                 //if(this->thruEn) this->midiDev->send((midi::MidiType)type, data1, data2, chan);
             }else{
                 unsigned int SysExLength = data1 + (data2 * 256);
-                usbMIDI.sendSysEx(SysExLength, this->midiDev->getSysExArray(), true, this->usbCable);
+                usbMIDI.sendSysEx(SysExLength, this->softSer?this->SoftSer_midiDev->getSysExArray():this->midiDev->getSysExArray(), true, this->usbCable);
                 //if(this->thruEn) this->midiDev->sendSysEx(SysExLength, this->midiDev->getSysExArray(),true);
             }
         }
@@ -83,14 +122,22 @@ public:
 
     void setThru(bool en){
         this->thruEn = en;
-        if(this->thruEn) this->midiDev->turnThruOn();
-        else this->midiDev->turnThruOff();
+        if(this->softSer){
+            if(this->thruEn) this->SoftSer_midiDev->turnThruOn();
+            else this->SoftSer_midiDev->turnThruOff();
+        }else{
+            if(this->thruEn) this->midiDev->turnThruOn();
+            else this->midiDev->turnThruOff();
+        }
+        
     }
 
     midi::MidiInterface<midi::SerialMIDI<HardwareSerial>>* midiDev;
+    midi::MidiInterface<midi::SerialMIDI<SoftwareSerial>>* SoftSer_midiDev;
 private:
     int usbCable = 0;
     bool thruEn = false;
+    bool softSer = false;
 };
 
 
@@ -137,7 +184,7 @@ private:
     uint16_t serialOutBufReadIndex = 0;
     
     elapsedMillis meterReadTimer = 0;
-    uint16_t meterReadTimeMillis = METER_READING_TIME_MS;
+    uint32_t meterReadTimeMillis = METER_READING_TIME_MS;
 
 public:
     Meter_Manager(int addr, byte id){
@@ -159,7 +206,7 @@ public:
         if(this->serialInBufReadIndex != this->serialInBufWriteIndex){
             Serial.write(SERIAL_START_BYTE1);
             Serial.write(SERIAL_START_BYTE2);
-            uint16_t byteCount = 0;
+            uint32_t byteCount = 0;
             if(this->serialInBufReadIndex < this->serialInBufWriteIndex) byteCount = this->serialInBufWriteIndex - this->serialInBufReadIndex;
             else byteCount = BIG_BUF_SIZE - this->serialInBufReadIndex + this->serialInBufWriteIndex;
             Serial.write(byteCount >> 8 & 0xff);
@@ -175,7 +222,7 @@ public:
         // @TODO:
         // Run tests on this code to ensure that it is working correctly
         while(this->serialOutBufReadIndex != this->serialOutBufWriteIndex){
-            uint16_t byteCount = 0;
+            uint32_t byteCount = 0;
             if(this->serialOutBufReadIndex < this->serialOutBufWriteIndex) byteCount = this->serialOutBufWriteIndex - this->serialOutBufReadIndex;
             else byteCount = BIG_BUF_SIZE - this->serialOutBufReadIndex + this->serialOutBufWriteIndex;
             Wire.beginTransmission(this->I2C_Addr);
@@ -189,7 +236,7 @@ public:
                 if(this->serialOutBufReadIndex >= BIG_BUF_SIZE) this->serialOutBufReadIndex = 0;
             }
             Wire.endTransmission();
-            if(byteCount >=28 ) delay(10); // give the nano time to deal with the data before looping again
+            if(byteCount >=28 ) delay(15); // give the nano time to deal with the data before looping again
         }
         if (meterReadTimer < meterReadTimeMillis)return;
         meterReadTimer = 0;
@@ -313,7 +360,7 @@ public:
         return val2 == 0xff && val1 == 1;
     }
 
-    void setAmmeter_VperA(int cal, int meter){
+    void setAmmeter_VperA(int cal, uint8_t meter){
         Wire.beginTransmission(this->I2C_Addr);
         Wire.write(meterWireCommands::setSensorVperA);
         Wire.write(meter);
@@ -323,7 +370,7 @@ public:
         Wire.endTransmission();
     }
 
-    void resetOneSensorMax(int sensNum){
+    void resetOneSensorMax(uint8_t sensNum){
         Wire.beginTransmission(this->I2C_Addr);
         Wire.write(meterWireCommands::resetOneSensorMax);
         Wire.write(sensNum);
@@ -336,12 +383,57 @@ public:
         Wire.endTransmission();
     }
 
-    void readOneSensorMax(int meter){}
-    void readOneSensorInstant(int meter){}
-    void readOneSensorRaw(int meter){}
-    void readOneSensorAvg(int meter){}
-    void setAveragerN_vals(int v, int meter){
+    void readOneSensorMax(uint8_t meter){
+        if(meter >= 6) return;
+        Wire.beginTransmission(this->I2C_Addr);
+        Wire.write(meterWireCommands::readOneSensorMax);
+        Wire.write(meter);
+        Wire.endTransmission();
+        Wire.requestFrom(this->I2C_Addr, 5);
+        long val = 0;
+        val |= (long(Wire.read()) << 24);
+        val |= (long(Wire.read()) << 16);
+        val |= (long(Wire.read()) << 8);
+        val |= long(Wire.read());
+        this->maxReadings[meter] = val;
+    }
+    
+    void readOneSensorInstant(uint8_t meter){
+        if(meter >= 6) return;
+        Wire.beginTransmission(this->I2C_Addr);
+        Wire.write(meterWireCommands::readOneSensorInstant);
+        Wire.write(meter);
+        Wire.endTransmission();
+        Wire.requestFrom(this->I2C_Addr, 5);
+        long val = 0;
+        val |= (long(Wire.read()) << 24);
+        val |= (long(Wire.read()) << 16);
+        val |= (long(Wire.read()) << 8);
+        val |= long(Wire.read());
+        this->instantReadings[meter] = val;
+    }
+    
+    void readOneSensorAvg(uint8_t meter){
+        if(meter >= 6) return;
+        Wire.beginTransmission(this->I2C_Addr);
+        Wire.write(meterWireCommands::readOneSensorAvg);
+        Wire.write(meter);
+        Wire.endTransmission();
+        Wire.requestFrom(this->I2C_Addr, 5);
+        long val = 0;
+        val |= (long(Wire.read()) << 24);
+        val |= (long(Wire.read()) << 16);
+        val |= (long(Wire.read()) << 8);
+        val |= long(Wire.read());
+        this->avgReadings[meter] = val;
+    }
 
+    void setAveragerN_vals(uint8_t v, uint8_t meter){
+        Wire.beginTransmission(this->I2C_Addr);
+        Wire.write(meterWireCommands::setAveragerN_vals);
+        Wire.write(meter);
+        Wire.write(v);
+        Wire.endTransmission();
     }
 
     bool addSerialDataToOutBuffer(byte* arr, unsigned int len){
@@ -350,7 +442,7 @@ public:
         else byteCount = BIG_BUF_SIZE - this->serialOutBufReadIndex + this->serialOutBufWriteIndex;
         if(byteCount + len > BIG_BUF_SIZE)return false; // not enough room
 
-        for(int i = 0; i < len; i++){
+        for(unsigned int i = 0; i < len; i++){
             this->serialOutBuf[this->serialOutBufWriteIndex++] = arr[i];
             if(this->serialOutBufWriteIndex >= BIG_BUF_SIZE) this->serialOutBufWriteIndex = 0;
         }
@@ -375,13 +467,12 @@ public:
     }
 };
 
-
-
 Meter_Manager* meters[MAX_NUMBER_OF_METERS];
-SerialMidiManager* serialMidiDevs[8];
+SerialMidiManager* serialMidiDevs[16];
 int nDevices = 0;
 
 void setup() {
+    delay(1000); // Give the sensors time to start
     Wire.begin();
     Wire.setClock(400000);
     // Scan the Wire bus for all devices to find all the volt meters and ammeters
@@ -399,17 +490,11 @@ void setup() {
     for(int i = 0; i < 8; i++){
         serialMidiDevs[i] = new SerialMidiManager(&HW_midi[i], i);
     }
+    for(int i = 8; i < 16; i++){
+        serialMidiDevs[i] = new SerialMidiManager(&SW_midi[i - 8], i);
+    }
     Serial.begin(115200);
     while (!Serial) {}
-    // serialMIDI_1.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_2.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_3.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_4.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_5.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_6.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_7.begin(MIDI_CHANNEL_OMNI);
-    // serialMIDI_8.begin(MIDI_CHANNEL_OMNI);
-    
 }
 elapsedMillis watchdog = 1100;
 void loop() {
@@ -418,10 +503,10 @@ void loop() {
         meters[i]->update();
     }
     // call update() for all the midi ports
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < 16; i++){
         serialMidiDevs[i]->update();
     }
-    // 
+    // get midi data from the usb
     if(usbMIDI.read()){
         byte type = usbMIDI.getType();
         byte channel = usbMIDI.getChannel();
@@ -435,6 +520,11 @@ void loop() {
             unsigned int SysExLength = data1 + data2 * 256;
             serialMidiDevs[cable]->midiDev->sendSysEx(SysExLength,usbMIDI.getSysExArray(),true);
         }
+    }
+
+    while(Serial.available()){
+        //@TODO:
+        // this entire section....
     }
 }
 
