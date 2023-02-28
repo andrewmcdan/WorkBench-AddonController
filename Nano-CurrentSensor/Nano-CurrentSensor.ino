@@ -121,10 +121,8 @@ ACS712* ammeters[6] = {&ammeter0,&ammeter1,&ammeter2,&ammeter3,&ammeter4,&ammete
 
 unsigned char wireInCommand[32] = {0};
 bool ready[2] = {false,false};
-unsigned int numSerialBytesRead = 0, numSerialByteToBeWritten = 0;
-unsigned char serialDataIn[64];
-unsigned int serialDataInIndex = 0;
 unsigned int delayTime = 1;
+uint8_t numSerialBytesToWrite = 0;
 
 void setup()
 {
@@ -152,14 +150,6 @@ void loop()
 {
     for(int i = 0; i < 6; i++){
         ammeters[i]->update();
-    }
-
-    while(Serial.available()){
-        serialDataIn[serialDataInIndex] = Serial.read();
-        serialDataInIndex++;
-        if(serialDataInIndex > 63) serialDataInIndex = 0;
-        numSerialBytesRead++;
-        if(numSerialBytesRead > 64) numSerialBytesRead = 64;
     }
     delayMicroseconds(delayTime);
 }
@@ -227,7 +217,7 @@ void wireReceiveEvent(int numBytes){
             uint32_t count = 0;
             count |= wireInCommand[1] << 8;
             count |= wireInCommand[2];
-            for(int i = 0; i < count; i++){
+            for(uint32_t i = 0; i < count; i++){
                 Serial.write(wireInCommand[i+2]);
             }
             break;
@@ -275,10 +265,11 @@ void wireRequestEvent(){
         }
         case wireCommands::readOneSensorMax:
         {
+            //@TODO: This needs to be rewritten
             Wire.write(4);
             unsigned char command = wireInCommand[1];
             for(int i = 0; i < 6; i++){
-                if(command & 1 == 1){
+                if((command & 1) == 1){
                     long val = ammeters[i]->getMaxMilliamps();
                     Wire.write(val >> 24);
                     Wire.write(val >> 16);
@@ -286,16 +277,21 @@ void wireRequestEvent(){
                     Wire.write(val & 0xff);
                     i = 6;
                 }
-                command >> 1;
+                command = command >> 1;
             }
             break;
         }
         case wireCommands::getNumSerialBytesAvailable:
         {
+            numSerialBytesToWrite = Serial.available();
+            Wire.write(numSerialBytesToWrite);
             break;
         }
         case wireCommands::getAvailableSerialBytes:
         {
+            for(uint8_t i = 0; i < numSerialBytesToWrite; i++){   
+                Wire.write(Serial.read());
+            }
             break;
         }
         case wireCommands::readAllSensorsInstant:
@@ -340,13 +336,4 @@ void wireRequestEvent(){
             break;
         }
     }
-}
-
-int countBits(unsigned char val){
-    int count = 0;
-    while(val > 0){
-        if(val & 1) count++;
-        val >> 1;
-    }
-    return count;
 }

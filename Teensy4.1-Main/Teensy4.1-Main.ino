@@ -11,6 +11,7 @@
 #include "Teensy4.1-Main.h"
 #include <functional>
 #include <vector>
+#include <string>
 #include <SoftwareSerial.h>
 
 #define BIG_BUF_SIZE 65536
@@ -22,8 +23,6 @@
 // these must be set according to which ammeters are soldered onto the PCB
 //const int ammeter1_mVperA[6] = { 40,40,185,185,185,185 }; // 50A, 50A, 5A, 5A, 5A, 5A
 //const int ammeter2_mVperA[6] = { 66,66,66,66,185,185 }; //  30A, 30A, 30A, 30A, 5A, 5A
-
-char* bigBufs[MAX_NUMBER_OF_METERS];
 
 // these lines use MACRO calls to setup the serial midi 
 // MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, serialMIDI_1);
@@ -99,11 +98,10 @@ public:
         this->usbCable = cable;
         this->SoftSer_midiDev->begin(MIDI_CHANNEL_OMNI);
         this->setThru(false);
-        this->softSer = false;
+        this->softSer = true;
     }
 
     void update(){
-
         if(this->softSer?this->SoftSer_midiDev->read():this->midiDev->read()){
             byte type = this->softSer?this->SoftSer_midiDev->getType():this->midiDev->getType();
             byte chan = this->softSer?this->SoftSer_midiDev->getChannel():this->midiDev->getChannel();
@@ -123,6 +121,7 @@ public:
     void setThru(bool en){
         this->thruEn = en;
         if(this->softSer){
+            //return;
             if(this->thruEn) this->SoftSer_midiDev->turnThruOn();
             else this->SoftSer_midiDev->turnThruOff();
         }else{
@@ -290,14 +289,12 @@ public:
             Wire.write(meterWireCommands::getNumSerialBytesAvailable);
             Wire.endTransmission();
             Wire.requestFrom(this->I2C_Addr, meterWireNumBytesToRead::getNumSerialBytesAvail);
-            uint16_t number = 0;
-            number |= (uint16_t(Wire.read()) << 8);
-            number |= uint16_t(Wire.read());
+            uint8_t number = uint8_t(Wire.read());
             if(number > 0){
                 Wire.beginTransmission(this->I2C_Addr);
                 Wire.write(meterWireCommands::getAvailableSerialBytes);
                 Wire.endTransmission();
-                Wire.requestFrom(this->I2C_Addr, number);
+                Wire.requestFrom(this->I2C_Addr, (int)number);
                 for(int i = 0; i < number; i++){
                     this->serialInBuf[this->serialInBufWriteIndex++] = Wire.read();
                     if(this->serialInBufWriteIndex >= BIG_BUF_SIZE) this->serialInBufWriteIndex = 0;
@@ -473,6 +470,8 @@ int nDevices = 0;
 
 void setup() {
     delay(1000); // Give the sensors time to start
+    Serial.begin(115200);
+    while (!Serial) {}
     Wire.begin();
     Wire.setClock(400000);
     // Scan the Wire bus for all devices to find all the volt meters and ammeters
@@ -493,8 +492,6 @@ void setup() {
     for(int i = 8; i < 16; i++){
         serialMidiDevs[i] = new SerialMidiManager(&SW_midi[i - 8], i);
     }
-    Serial.begin(115200);
-    while (!Serial) {}
 }
 elapsedMillis watchdog = 1100;
 void loop() {
