@@ -12,7 +12,7 @@
 #include "Arduino.h"
 #include "EEPROM.h"
 
-#define AVERAGER_MAX_SIZE 40
+#define AVERAGER_MAX_SIZE 32
 
 enum wireCommands:int {
     readOneSensorAvg,//
@@ -122,19 +122,21 @@ ACS712* ammeters[6] = {&ammeter0,&ammeter1,&ammeter2,&ammeter3,&ammeter4,&ammete
 unsigned char wireInCommand[32] = {0};
 bool ready[2] = {false,false};
 unsigned int delayTime = 1;
-uint8_t numSerialBytesToWrite = 0;
+unsigned int numSerialBytesToWrite = 0;
 
 void setup()
 {
-    pinMode(12,INPUT_PULLUP);
-    pinMode(11,INPUT_PULLUP);
-    pinMode(10,INPUT_PULLUP);
-    pinMode(9,INPUT_PULLUP);
-    pinMode(8,INPUT_PULLUP);
-    pinMode(7,INPUT_PULLUP);
-    pinMode(6,INPUT_PULLUP);
+    pinMode(12,INPUT_PULLUP); // | I2C addr pins
+    pinMode(11,INPUT_PULLUP); // v
+    pinMode(10,INPUT_PULLUP); //
+    pinMode(9,INPUT_PULLUP);  //
+    pinMode(8,INPUT_PULLUP);  //
+    pinMode(7,INPUT_PULLUP);  // ^
+    pinMode(6,INPUT_PULLUP);  // | I2C addr pins
+    pinMode(5,INPUT_PULLUP);  // Device mode pin. High for ammeter, low for voltmeter @TODO: Need to actually implement this
     Serial.begin(115200);
     Wire.begin(digitalRead(12) + (digitalRead(11) << 1) + (digitalRead(10) << 2) + (digitalRead(9) << 3) + (digitalRead(8) << 4) + (digitalRead(7) << 5) + (digitalRead(6) << 6));
+    //Wire.setClock(400000);
     Wire.onReceive(wireReceiveEvent);
     Wire.onRequest(wireRequestEvent);
     pinMode(A0, INPUT);
@@ -152,6 +154,14 @@ void loop()
         ammeters[i]->update();
     }
     delayMicroseconds(delayTime);
+    if(!ready[1]){
+        if( ammeters[0]->isReady() &&
+            ammeters[1]->isReady() &&
+            ammeters[2]->isReady() &&
+            ammeters[3]->isReady() &&
+            ammeters[4]->isReady() &&
+            ammeters[5]->isReady()) ready[1] = true;
+    }
 }
 
 void wireReceiveEvent(int numBytes){
@@ -259,7 +269,7 @@ void wireRequestEvent(){
         }
         case wireCommands::getStatus:
         {
-            Wire.write(0xaa); // indicates that this is an ammeter
+            Wire.write(0xa0); // indicates that this is an ammeter // @TODO: use digitalRead to set this 
             Wire.write(((ready[0])?0xf0:0x00) | ((ready[1])?0x0f:0x00));
             break;
         }
