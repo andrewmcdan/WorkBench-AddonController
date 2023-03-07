@@ -241,26 +241,6 @@ public:
     void update() {
         // @TODO:
         // Run tests on this code to ensure that it is working correctly
-
-        //@TODO: move this section of code to the block of comments below
-        // if(this->serialInBufReadIndex != this->serialInBufWriteIndex){
-        //     Serial.write(SERIAL_START_BYTE1);
-        //     Serial.write(SERIAL_START_BYTE2);
-        //     uint32_t byteCount = 0;
-        //     if(this->serialInBufReadIndex < this->serialInBufWriteIndex) byteCount = this->serialInBufWriteIndex - this->serialInBufReadIndex;
-        //     else byteCount = BIG_BUF_SIZE - this->serialInBufReadIndex + this->serialInBufWriteIndex;
-        //     Serial.write(byteCount >> 8 & 0xff);
-        //     Serial.write(byteCount & 0xff);
-        //     Serial.write(0xa2); // serial data class
-        //     Serial.write(this->id_ + 1);
-        //     while(this->serialInBufReadIndex != this->serialInBufWriteIndex){
-        //         Serial.write(this->serialInBuf[this->serialInBufReadIndex++]);
-        //         if(this->serialInBufReadIndex >= BIG_BUF_SIZE) this->serialInBufReadIndex = 0;
-        //     }
-        // }
-
-        // @TODO:
-        // Run tests on this code to ensure that it is working correctly
         while(this->serialOutBufReadIndex != this->serialOutBufWriteIndex){
             uint32_t byteCount = 0;
             if(this->serialOutBufReadIndex < this->serialOutBufWriteIndex) byteCount = this->serialOutBufWriteIndex - this->serialOutBufReadIndex;
@@ -277,17 +257,6 @@ public:
                 if(this->serialOutBufReadIndex >= BIG_BUF_SIZE) this->serialOutBufReadIndex = 0;
             }
             dWire.write(this->I2C_Addr,arr,length,0);
-            //Wire.beginTransmission(this->I2C_Addr);
-            //Wire.write(meterWireCommands::writeSerialData);
-            // the receive buffer on the Arduino Nano is only 32 bytes, so we have to break this up to ensure 
-            // we don't overrun the buffer and lose data.
-            //Wire.write((byteCount>28)?28:byteCount >> 8 & 0xff);
-            //Wire.write((byteCount>28)?28:byteCount & 0xff);
-            //for(int i = 0; i < (byteCount>28)?28:byteCount ; i++){
-            //    Wire.write(this->serialOutBuf[this->serialOutBufReadIndex++]);
-            //    if(this->serialOutBufReadIndex >= BIG_BUF_SIZE) this->serialOutBufReadIndex = 0;
-            //}
-            //Wire.endTransmission();
             if(byteCount >=28 ) delay(5); // give the nano time to deal with the data before looping again
         }
 
@@ -352,22 +321,6 @@ public:
                 delay(10);
             }
 
-            // Wire.beginTransmission(this->I2C_Addr);
-            // Wire.write(meterWireCommands::readAllSensorsAvg);
-            // Wire.endTransmission();
-            // Wire.requestFrom(this->I2C_Addr, meterWireNumBytesToRead::readAllSensors);
-            /*unsigned char numBytes = */Wire.read(); // first byte indicates number of bytes that will be read. Unused. 
-            // long val = 0;
-            // for (int b = 0; b < 6; b++) {
-            //     val |= (long(Wire.read()) << 24);
-            //     val |= (long(Wire.read()) << 16);
-            //     val |= (long(Wire.read()) << 8);
-            //     val |= long(Wire.read());
-            //     this->avgReadings[b] = val;
-            //     val = 0;
-            // }
-
-
             arr1[0] = meterWireCommands::readAllSensorsMax;
             if(dWire.write(this->I2C_Addr,arr1,1,0)){
                 delay(1);
@@ -388,23 +341,6 @@ public:
             }else{
                 delay(10);
             }
-
-            // Wire.beginTransmission(this->I2C_Addr);
-            // Wire.write(meterWireCommands::readAllSensorsMax);
-            // Wire.endTransmission();
-            // Wire.requestFrom(this->I2C_Addr, meterWireNumBytesToRead::readAllSensors);
-            // /*numBytes = */Wire.read(); // first byte indicates number of bytes that will be read. Unused. 
-            // val = 0;
-            // for (int b = 0; b < 6; b++) {
-            //     val |= (long(Wire.read()) << 24);
-            //     val |= (long(Wire.read()) << 16);
-            //     val |= (long(Wire.read()) << 8);
-            //     val |= long(Wire.read());
-            //     this->maxReadings[b] = val;
-            //     val = 0;
-            // }
-
-
             arr1[0] = meterWireCommands::readAllSensorsInstant;
             if(dWire.write(this->I2C_Addr,arr1,1,0)){
                 delay(1);
@@ -425,40 +361,6 @@ public:
             }else{
                 delay(10);
             }
-
-            // Wire.beginTransmission(this->I2C_Addr);
-            // Wire.write(meterWireCommands::readAllSensorsInstant);
-            // Wire.endTransmission();
-            // Wire.requestFrom(this->I2C_Addr, meterWireNumBytesToRead::readAllSensors);
-            // /*numBytes = */Wire.read(); // first byte indicates number of bytes that will be read. Unused. 
-            // val = 0;
-            // for (int b = 0; b < 6; b++) {
-            //     val |= (long(Wire.read()) << 24);
-            //     val |= (long(Wire.read()) << 16);
-            //     val |= (long(Wire.read()) << 8);
-            //     val |= long(Wire.read());
-            //     this->instantReadings[b] = val;
-            //     val = 0;
-            // }
-
-
-            
-
-            // Wire.beginTransmission(this->I2C_Addr);
-            // Wire.write(meterWireCommands::getNumSerialBytesAvailable);
-            // Wire.endTransmission();
-            // Wire.requestFrom(this->I2C_Addr, meterWireNumBytesToRead::getNumSerialBytesAvail);
-            // uint8_t number = uint8_t(Wire.read());
-            // if(number > 0){
-            //     Wire.beginTransmission(this->I2C_Addr);
-            //     Wire.write(meterWireCommands::getAvailableSerialBytes);
-            //     Wire.endTransmission();
-            //     Wire.requestFrom(this->I2C_Addr, (int)number);
-            //     for(int i = 0; i < number; i++){
-            //         this->serialInBuf[this->serialInBufWriteIndex++] = Wire.read();
-            //         if(this->serialInBufWriteIndex >= BIG_BUF_SIZE) this->serialInBufWriteIndex = 0;
-            //     }
-            // }
 
         } else {
             this->meterReady_ = this->meterReady();
@@ -494,7 +396,6 @@ public:
 
     // Check to see if both ammeters are ready for reading. Returns false if either one is not ready.
     bool meterReady() {        
-        //delay(100);
         byte arr[2] = {meterWireCommands::getStatus};
         bool t = true;
         while(t){
@@ -502,34 +403,13 @@ public:
             delay(1);
             t = !dWire.request(this->I2C_Addr,arr,2);
         }
-        
         this->deviceClass = arr[0];
         return arr[1] == 0xff;
-
-
-
-        // Wire.beginTransmission(this->I2C_Addr);
-        // Wire.write(meterWireCommands::getStatus);
-        // Wire.endTransmission();
-        // Wire.requestFrom(this->I2C_Addr,meterWireNumBytesToRead::getStatus_B);
-        // delay(10);
-        // byte val1 = Wire.read();
-        // this->deviceClass = val1;
-        // byte val2 = Wire.read();
-        // return val2 == 0xff;
     }
 
     void setAmmeter_VperA(int cal, uint8_t meter){
         byte arr[4] = {meterWireCommands::setSensorVperA,meter,cal>>8,cal&0xff};
         dWire.write(this->I2C_Addr,arr,4,10);
-
-        // Wire.beginTransmission(this->I2C_Addr);
-        // Wire.write(meterWireCommands::setSensorVperA);
-        // Wire.write(meter);
-        // unsigned int val = cal;
-        // Wire.write(val >> 8);
-        // Wire.write(val & 0xff);
-        // Wire.endTransmission();
     }
 
     void resetOneSensorMax(uint8_t sensNum){
