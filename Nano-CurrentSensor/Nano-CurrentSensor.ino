@@ -122,7 +122,11 @@ ACS712* ammeters[6] = {&ammeter0,&ammeter1,&ammeter2,&ammeter3,&ammeter4,&ammete
 unsigned char wireInCommand[32] = {0};
 bool ready[2] = {false,false};
 unsigned int delayTime = 1;
-unsigned int numSerialBytesToWrite = 0;
+
+uint8_t serialBuf[256];
+uint8_t serialBuf_readPntr = 0;
+uint8_t serialBuf_writePntr = 0;
+uint8_t serialBuf_bytesToRead = 0;
 
 void setup()
 {
@@ -161,6 +165,10 @@ void loop()
             ammeters[3]->isReady() &&
             ammeters[4]->isReady() &&
             ammeters[5]->isReady()) ready[1] = true;
+    }
+    while(Serial.available()){
+        serialBuf[serialBuf_writePntr++]=Serial.read();
+        if(serialBuf_bytesToRead < 255)serialBuf_bytesToRead++;
     }
 }
 
@@ -293,15 +301,23 @@ void wireRequestEvent(){
         }
         case wireCommands::getNumSerialBytesAvailable:
         {
-            numSerialBytesToWrite = Serial.available();
-            Wire.write(numSerialBytesToWrite);
+            Wire.write(serialBuf_bytesToRead);
             break;
         }
         case wireCommands::getAvailableSerialBytes:
         {
-            for(uint8_t i = 0; i < numSerialBytesToWrite; i++){   
-                Wire.write(Serial.read());
-            }
+            if(serialBuf_bytesToRead > 32){
+                for(uint8_t i = 0; i < 32; i++){
+                    Wire.write(serialBuf[serialBuf_readPntr++]);
+                    if(serialBuf_bytesToRead>0)serialBuf_bytesToRead--;
+                }
+            }else{
+                uint8_t t = serialBuf_bytesToRead;
+                for(uint8_t i = 0; i < t; i++){
+                    Wire.write(serialBuf[serialBuf_readPntr++]);
+                    if(serialBuf_bytesToRead>0)serialBuf_bytesToRead--;
+                }
+            }   
             break;
         }
         case wireCommands::readAllSensorsInstant:
