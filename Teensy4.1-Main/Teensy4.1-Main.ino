@@ -168,6 +168,7 @@ public:
         if(r != len)return false;
         for(byte i = 0; i < len; i++){
             data[i] = this->wireDev->read();
+            delayMicroseconds(100);
         }
         return true;
     }
@@ -211,10 +212,7 @@ private:
     long avgReadings[6] = {0};
     long maxReadings[6] = {0};
     long instantReadings[6] = {0};
-    char* serialInBuf;
     char* serialOutBuf;
-    uint16_t serialInBufWriteIndex = 0;
-    uint16_t serialInBufReadIndex = 0;
     uint16_t serialOutBufWriteIndex = 0;
     uint16_t serialOutBufReadIndex = 0;
     
@@ -228,7 +226,6 @@ public:
     Meter_Manager(int addr, byte id){
         this->I2C_Addr = addr;
         this->meterReady_ = this->meterReady();
-        this->serialInBuf = (char*)extmem_malloc(BIG_BUF_SIZE);
         this->serialOutBuf = (char*)extmem_malloc(BIG_BUF_SIZE);
         this->id_ = id;
     }
@@ -265,13 +262,13 @@ public:
             serialReadTimer = 0;
             byte arr2[1] = {meterWireCommands::getNumSerialBytesAvailable};
             if(dWire.write(this->I2C_Addr,arr2,1,0)){
-                delay(1);
+                delayMicroseconds(500);
                 if(dWire.request(this->I2C_Addr,arr2,1)){
                     uint8_t number = arr2[0];
                     while(number>0){
                         arr2[0] = meterWireCommands::getAvailableSerialBytes;
                         if(dWire.write(this->I2C_Addr,arr2,1,0)){
-                            delay(1);
+                            delayMicroseconds(500);
                             byte arr32[32];
                             if(dWire.request(this->I2C_Addr,arr32,(number>32)?32:number)){
                                 Serial.write(SERIAL_START_BYTE1);
@@ -287,14 +284,14 @@ public:
                                 else number = 0;
                             }
                         }else{
-                            delay(1);
+                            delayMicroseconds(500);
                         }
                     }
                 }else{
-                    delay(1);
+                    delayMicroseconds(500);
                 }
             }else{
-                delay(1);
+                delayMicroseconds(500);
             }
         }
         if (meterReadTimer < meterReadTimeMillis)return;
@@ -302,7 +299,7 @@ public:
         if (this->meterReady_) {
             byte arr1[1] = {meterWireCommands::readAllSensorsAvg};
             if(dWire.write(this->I2C_Addr,arr1,1,0)){
-                delay(1);
+                delayMicroseconds(500);
                 byte arr25[25];
                 if(dWire.request(this->I2C_Addr,arr25,meterWireNumBytesToRead::readAllSensors)){
                     long val = 0;
@@ -315,15 +312,15 @@ public:
                         val = 0;
                     }
                 }else{
-                    delay(10);
+                    delayMicroseconds(500);
                 }
             }else{
-                delay(10);
+                delayMicroseconds(500);
             }
 
             arr1[0] = meterWireCommands::readAllSensorsMax;
             if(dWire.write(this->I2C_Addr,arr1,1,0)){
-                delay(1);
+                delayMicroseconds(500);
                 byte arr25[25];
                 if(dWire.request(this->I2C_Addr,arr25,meterWireNumBytesToRead::readAllSensors)){
                     long val = 0;
@@ -336,14 +333,14 @@ public:
                         val = 0;
                     }
                 }else{
-                    delay(10);
+                    delayMicroseconds(500);
                 }
             }else{
-                delay(10);
+                delayMicroseconds(500);
             }
             arr1[0] = meterWireCommands::readAllSensorsInstant;
             if(dWire.write(this->I2C_Addr,arr1,1,0)){
-                delay(1);
+                delayMicroseconds(500);
                 byte arr25[25];
                 if(dWire.request(this->I2C_Addr,arr25,meterWireNumBytesToRead::readAllSensors)){
                     long val = 0;
@@ -356,10 +353,10 @@ public:
                         val = 0;
                     }
                 }else{
-                    delay(10);
+                    delayMicroseconds(500);
                 }
             }else{
-                delay(10);
+                delayMicroseconds(500);
             }
 
         } else {
@@ -400,7 +397,7 @@ public:
         bool t = true;
         while(t){
             dWire.write(this->I2C_Addr,arr,1,10);
-            delay(1);
+            delayMicroseconds(500);
             t = !dWire.request(this->I2C_Addr,arr,2);
         }
         this->deviceClass = arr[0];
@@ -512,6 +509,10 @@ public:
 Meter_Manager* meters[MAX_NUMBER_OF_METERS];
 SerialMidiManager* serialMidiDevs[16];
 int nDevices = 0;
+EXTMEM byte unprocessedSerialInData[BIG_BUF_SIZE];
+unsigned int unprocessedSerialIn_readPntr = 0;
+unsigned int unprocessedSerialIn_writePntr = 0;
+unsigned int unprocessedSerialIn_numBytes = 0;
 
 void setup() {
     delay(1000); // Give the sensors time to start
@@ -565,9 +566,59 @@ void loop() {
         }
     }
 
+    // Read serial data into ring buffer
     while(Serial.available()){
-        //@TODO:
-        // this entire section....
+        unprocessedSerialInData[unprocessedSerialIn_writePntr++] = Serial.read();
+        if(unprocessedSerialIn_writePntr >= BIG_BUF_SIZE) unprocessedSerialIn_writePntr = 0;
+        unprocessedSerialIn_numBytes++;
+        if(unprocessedSerialIn_numBytes > BIG_BUF_SIZE) unprocessedSerialIn_numBytes = BIG_BUF_SIZE;
+        if(unprocessedSerialIn_numBytes == BIG_BUF_SIZE) unprocessedSerialIn_readPntr++;
+        if(unprocessedSerialIn_readPntr >= BIG_BUF_SIZE) unprocessedSerialIn_readPntr = 0;
+    }
+
+
+    bool serialProcessing = true;
+    while(serialProcessing){
+        // read through the buffer until we get to a start byte
+        while(unprocessedSerialInData[unprocessedSerialIn_readPntr] != 0b10101010 && unprocessedSerialIn_numBytes > 0){
+            unprocessedSerialIn_readPntr++;
+            unprocessedSerialIn_numBytes--;
+        }
+        // only continue if there are more than a headers worth of bytes in the buffer
+        if(unprocessedSerialIn_numBytes > 4){
+            if(unprocessedSerialInData[unprocessedSerialIn_readPntr + 1] == 0b11001100){
+                uint16_t byteCount = (unprocessedSerialInData[unprocessedSerialIn_readPntr + 2] >> 8) | unprocessedSerialInData[unprocessedSerialIn_readPntr + 3];
+                if(unprocessedSerialIn_numBytes > byteCount){
+                    uint8_t command = unprocessedSerialInData[unprocessedSerialIn_readPntr + 4];
+                    switch(command){ //@TODO: finish all of he cases in this switch
+                        case 0x01: //set VperA for ammeter
+                            byte ammeterId = unprocessedSerialInData[unprocessedSerialIn_readPntr +5];
+                        break;
+                        case 0x02: // set baud for serial port
+                        break;
+                        case 0x03: // set ammeter loop delay time
+                        break;
+                        case 0x04: // set midi thru for port
+                        break;
+                        case 0x05: //  
+                        break;
+                    }
+                    
+                    for(unsigned int i = 0; i < byteCount + 4; i++){
+                        unprocessedSerialIn_readPntr++;
+                        if(unprocessedSerialIn_readPntr >= BIG_BUF_SIZE) unprocessedSerialIn_readPntr = 0;
+                        if(unprocessedSerialIn_numBytes > 0) unprocessedSerialIn_numBytes--;
+                    }
+                }else{
+                    serialProcessing = false;
+                }
+            }else{
+                unprocessedSerialIn_readPntr++;
+                unprocessedSerialIn_numBytes--;
+            }
+        }else{
+            serialProcessing = false;
+        }
     }
 }
 
