@@ -81,7 +81,7 @@ public:
         }
         averageMilliAmps = total/averagerN_vals;
     }
-    void set_mvPerA(unsigned int val){
+    void set_mvPerA(uint16_t val){
         if(val == 0) return;
         this->voltsPerAmp = val / 1000.0;
 
@@ -184,9 +184,9 @@ void wireReceiveEvent(int numBytes){
         case wireCommands::setSensorVperA:
         {
             if(wireInCommand[1] < 6){
-                unsigned int val1 = wireInCommand[2];
-                unsigned int val2 = wireInCommand[3];
-                unsigned int val3 = (val1 << 8) | val2;
+                uint16_t val1 = wireInCommand[2];
+                uint16_t val2 = wireInCommand[3];
+                uint16_t val3 = (val1 << 8) | val2;
                 ammeters[wireInCommand[1]]->set_mvPerA(val3);
                 // Serial.print("set_mvPerA: ");
                 // Serial.println(val3);
@@ -222,9 +222,11 @@ void wireReceiveEvent(int numBytes){
         }
         case wireCommands::setSerialBaud:
         {
-            uint16_t baud = 0;
-            baud |= wireInCommand[1] << 8;
-            baud |= wireInCommand[2];
+            uint32_t baud = 0;
+            baud |= wireInCommand[1] << 24;
+            baud |= wireInCommand[2] << 16;
+            baud |= wireInCommand[3] << 8;
+            baud |= wireInCommand[4];
 
             Serial.end();
             Serial.begin(baud);

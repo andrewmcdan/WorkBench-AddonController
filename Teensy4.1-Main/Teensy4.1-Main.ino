@@ -404,7 +404,7 @@ public:
         return arr[1] == 0xff;
     }
 
-    void setAmmeter_VperA(int cal, uint8_t meter){
+    void setAmmeter_VperA(uint16_t cal, uint8_t meter){
         byte arr[4] = {meterWireCommands::setSensorVperA,meter,cal>>8,cal&0xff};
         dWire.write(this->I2C_Addr,arr,4,10);
     }
@@ -489,10 +489,12 @@ public:
         return true; // there was room
     }
 
-    void setSerialBaud(uint16_t baud){
+    void setSerialBaud(uint32_t baud){
         Wire.beginTransmission(this->I2C_Addr);
-        Wire.write(meterWireCommands::resetOneSensorMax);
-        Wire.write(baud >> 8 & 0xff);
+        Wire.write(meterWireCommands::setSerialBaud);
+        Wire.write((baud >> 24) & 0xff);
+        Wire.write((baud >> 16) & 0xff);
+        Wire.write((baud >> 8) & 0xff);
         Wire.write(baud & 0xff);
         Wire.endTransmission();
     }
@@ -540,7 +542,7 @@ void setup() {
         serialMidiDevs[i] = new SerialMidiManager(&SW_midi[i - 8], i);
     }
 }
-//elapsedMillis watchdog = 1100;
+elapsedMillis heartBeat = 0;
 void loop() {
     // call update() for all the meters
     for(int i = 0; i < nDevices; i++){
@@ -566,6 +568,20 @@ void loop() {
         }
     }
 
+    // Send a heartbeat to the host on a regular
+    if(heartBeat > 1000){
+        heartBeat = 0;
+        Serial.write(SERIAL_START_BYTE1);
+        Serial.write(SERIAL_START_BYTE2);
+        Serial.write(((uint16_t)5 >> 8 ) & 0xff);
+        Serial.write(((uint16_t)5) & 0xff);
+        Serial.write(0xff);
+        Serial.write(0x00);
+        Serial.write(0xff);
+        Serial.write(0x00);
+        Serial.write(0xff);
+    }
+
     // Read serial data into ring buffer
     while(Serial.available()){
         unprocessedSerialInData[unprocessedSerialIn_writePntr++] = Serial.read();
@@ -580,27 +596,46 @@ void loop() {
     bool serialProcessing = true;
     while(serialProcessing){
         // read through the buffer until we get to a start byte
-        while(unprocessedSerialInData[unprocessedSerialIn_readPntr] != 0b10101010 && unprocessedSerialIn_numBytes > 0){
+        while(unprocessedSerialInData[unprocessedSerialIn_readPntr] != SERIAL_START_BYTE1 && unprocessedSerialIn_numBytes > 0){
             unprocessedSerialIn_readPntr++;
             unprocessedSerialIn_numBytes--;
         }
         // only continue if there are more than a headers worth of bytes in the buffer
         if(unprocessedSerialIn_numBytes > 4){
-            if(unprocessedSerialInData[unprocessedSerialIn_readPntr + 1] == 0b11001100){
+            if(unprocessedSerialInData[unprocessedSerialIn_readPntr + 1] == SERIAL_START_BYTE2){
                 uint16_t byteCount = (unprocessedSerialInData[unprocessedSerialIn_readPntr + 2] >> 8) | unprocessedSerialInData[unprocessedSerialIn_readPntr + 3];
                 if(unprocessedSerialIn_numBytes > byteCount){
                     uint8_t command = unprocessedSerialInData[unprocessedSerialIn_readPntr + 4];
                     switch(command){ //@TODO: finish all of he cases in this switch
                         case 0x01: //set VperA for ammeter
                             byte ammeterId = unprocessedSerialInData[unprocessedSerialIn_readPntr +5];
+                            uint16_t calVal = (unprocessedSerialInData[unprocessedSerialIn_readPntr + 6] << 8) | unprocessedSerialInData[unprocessedSerialIn_readPntr + 7];
+                            byte meterID = ammeterId  / 6; // meterId is the Arduino Nano
+                            byte meterSubId = ammeterId % 6; // meteSubId is the ammeter connected to the Nano
+                            if(meterID < nDevices){
+                                meters[meterID]->setAmmeter_VperA(calVal, meterSubId);
+                            }
                         break;
                         case 0x02: // set baud for serial port
+                            byte meterId = unprocessedSerialInData[unprocessedSerialIn_readPntr + 5];
+                            uint32_t baudR = 0;
+                            baudR |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 6] << 24;
+                            baudR |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 7] << 16;
+                            baudR |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 8] << 8;
+                            baudR |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 9];
+                            if(meterId < nDevices){
+                                meters[meterId]->setSerialBaud(baudR);
+                            }
                         break;
-                        case 0x03: // set ammeter loop delay time
+                        case 0x03: // set ammeter read time in ms
+
                         break;
-                        case 0x04: // set midi thru for port
+                        case 0x04: // set ammeter read time in Hz
+
                         break;
-                        case 0x05: //  
+                        case 0x05: // set midi thru for port
+                        break;
+                        case 0x06: //  reboot the teensy
                         break;
                     }
                     
@@ -621,4 +656,3 @@ void loop() {
         }
     }
 }
-
