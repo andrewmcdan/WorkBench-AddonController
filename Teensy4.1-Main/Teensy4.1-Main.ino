@@ -543,6 +543,7 @@ void setup() {
     }
 }
 elapsedMillis heartBeat = 0;
+/// @brief 
 void loop() {
     // call update() for all the meters
     for(int i = 0; i < nDevices; i++){
@@ -606,7 +607,7 @@ void loop() {
                 uint16_t byteCount = (unprocessedSerialInData[unprocessedSerialIn_readPntr + 2] >> 8) | unprocessedSerialInData[unprocessedSerialIn_readPntr + 3];
                 if(unprocessedSerialIn_numBytes > byteCount){
                     uint8_t command = unprocessedSerialInData[unprocessedSerialIn_readPntr + 4];
-                    switch(command){ //@TODO: finish all of he cases in this switch
+                    switch(command){ //@TODO: finish all of the cases in this switch
                         case 0x01: //set VperA for ammeter
                             byte ammeterId = unprocessedSerialInData[unprocessedSerialIn_readPntr +5];
                             uint16_t calVal = (unprocessedSerialInData[unprocessedSerialIn_readPntr + 6] << 8) | unprocessedSerialInData[unprocessedSerialIn_readPntr + 7];
@@ -628,10 +629,26 @@ void loop() {
                             }
                         break;
                         case 0x03: // set ammeter read time in ms
-
+                            byte meterId = unprocessedSerialInData[unprocessedSerialIn_readPntr + 5];
+                            uint32_t readTime = 0;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 6] << 24;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 7] << 16;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 8] << 8;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 9];
+                            if(meterId < nDevices){
+                                meters[meterId]->setMeterReadTime_ms(readTime);
+                            }
                         break;
                         case 0x04: // set ammeter read time in Hz
-
+                            byte meterId = unprocessedSerialInData[unprocessedSerialIn_readPntr + 5];
+                            uint32_t readTime = 0;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 6] << 24;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 7] << 16;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 8] << 8;
+                            readTime |= unprocessedSerialInData[unprocessedSerialIn_readPntr + 9];
+                            if(meterId < nDevices){
+                                meters[meterId]->setMeterReadTime_Hz(readTime);
+                            }
                         break;
                         case 0x05: // set midi thru for port
                         break;
